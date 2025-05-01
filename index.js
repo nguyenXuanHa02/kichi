@@ -2,24 +2,15 @@ const express = require('express');
 const { admin, db ,bucket} = require('./fbase.js');
 const utils = require('./utils.js');
 const { v4: uuidv4 } = require('uuid');
-const { VNPay, ignoreLogger } = require('vnpay');
+const { VNPay, ignoreLogger,ProductCode, VnpLocale, dateFormat  } = require('vnpay');
 const app = express();const multer = require('multer');
 require('dotenv').config();
 
 
 const vnpay = new VNPay({
-  tmnCode: 'YOUR_TMNCODE',
-  secureSecret: 'YOUR_SECURE_SECRET',
+  tmnCode: 'BFWLAW9Z',
+  secureSecret: 'EZ8S2XSRMSXKQ2BLYO80Y208GPWCRD8M',
   vnpayHost: 'https://sandbox.vnpayment.vn',
-  testMode: true, // tùy chọn, ghi đè vnpayHost thành sandbox nếu là true
-  hashAlgorithm: 'SHA512', // tùy chọn
-  enableLog: true, // tùy ch
-  loggerFn: ignoreLogger, // tùy chọn
-  endpoints: {
-      paymentEndpoint: 'paymentv2/vpcpay.html',
-      queryDrRefundEndpoint: 'merchant_webapi/api/transaction',
-      getBankListEndpoint: 'qrpayauth/api/merchant/get_bank_list',
-  }, // tùy chọn
 });
 
 var bodyParser = require('body-parser');
@@ -280,10 +271,28 @@ app.post('/order', async (req, res) => {
     res.status(500).send({ status: 'fail', message: 'An error occurred while placing the order' });
   }
 });
-
+app.get('/payout',(req,res)=>{
+  res.send('giao dich thanh cong');
+});
 app.post('/pay',  async (req,res)=> {
-  
-  res.status(500).send({status:'fail',  message:'Payment fail'});
+  const {orderId,amount,description}= req.body;
+  const tomorrow = new Date();
+  const ref = uuidv4();
+
+tomorrow.setDate(tomorrow.getDate() + 1);
+const paymentUrl = vnpay.buildPaymentUrl({
+    vnp_Amount: amount,
+    vnp_IpAddr:req.ip === '::1' ? '13.160.92.202' : req.ip,
+    vnp_TxnRef: orderId,
+    vnp_OrderInfo: description,
+    vnp_OrderType: ProductCode.Other,
+    vnp_Locale: VnpLocale.VN, // 'vn' hoặc 'en'
+    vnp_CreateDate: dateFormat(new Date()), // tùy chọn, mặc định là thời gian hiện tại
+    vnp_ExpireDate: dateFormat(tomorrow), 
+    vnp_ReturnUrl:'https://kichi.onrender.com/payout'    
+});
+    console.log(paymentUrl);
+  res.status(200).send(paymentUrl);
 });
 
 
