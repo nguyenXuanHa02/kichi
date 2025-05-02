@@ -325,7 +325,7 @@ const paymentUrl = vnpay.buildPaymentUrl({
     vnp_Locale: VnpLocale.VN, // 'vn' hoặc 'en'
     vnp_CreateDate: date, // tùy chọn, mặc định là thời gian hiện tại
     vnp_ExpireDate: dateFormat(tomorrow),     
-    vnp_ReturnUrl:'http://localhost:3000/payout'    
+    vnp_ReturnUrl:'https://kichi.onrender.com/payout'    
 });
     console.log(paymentUrl);
   res.status(200).send({
