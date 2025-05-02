@@ -2,7 +2,12 @@ const express = require('express');
 const { admin, db ,bucket} = require('./fbase.js');
 const utils = require('./utils.js');
 const { v4: uuidv4 } = require('uuid');
-const { VNPay, ignoreLogger,ProductCode, VnpLocale, dateFormat  } = require('vnpay');
+const { VNPay, ignoreLogger,ProductCode, VnpLocale, dateFormat,IpnFailChecksum,
+  IpnOrderNotFound,
+  IpnInvalidAmount,
+  InpOrderAlreadyConfirmed,
+  IpnUnknownError,
+  IpnSuccess,  } = require('vnpay');
 const app = express();const multer = require('multer');
 require('dotenv').config();
 
@@ -271,13 +276,28 @@ app.post('/order', async (req, res) => {
     res.status(500).send({ status: 'fail', message: 'An error occurred while placing the order' });
   }
 });
-app.get('/payout',(req,res)=>{
-  res.send('giao dich thanh cong');
+app.get('/payout',async (req, res) => {
+  try {
+    console.log(req.query);
+      const status = req.query['vnp_TransactionStatus'];
+      if(status==='00') res.status(200).send({'status':'success','message':'Giao dịch hoàn tất'});
+      if(status=='01')res.status(300).send({'status':'fail','message':'Giao dịch chưa hoàn tất'});      
+      if(status=='02')res.status(300).send({'status':'fail','message':'Giao dịch bị lỗi'});
+      if(status=='04')res.status(300).send({'status':'fail','message':'Giao dịch đảo (Khách hàng đã bị trừ tiền tại Ngân hàng nhưng GD chưa thành công ở VNPAY)'});
+      if(status=='05')res.status(300).send({'status':'fail','message':'VNPAY đang xử lý giao dịch này (GD hoàn tiền)'});
+      if(status=='06')res.status(300).send({'status':'fail','message':'VNPAY đã gửi yêu cầu hoàn tiền sang Ngân hàng (GD hoàn tiền)'});
+      if(status=='07')res.status(300).send({'status':'fail','message':'Giao dịch bị nghi ngờ gian lận'});
+      if(status=='09')res.status(300).send({'status':'fail','message':'GD Hoàn trả bị từ chối'});      
+  } catch (error) {      
+      console.log(`verify error: ${error}`);
+      res.status(300).send({'status':'fail','message':'Giao dịch chưa hoàn tất'});      
+  }
 });
 app.post('/pay',  async (req,res)=> {
   const {orderId,amount,description}= req.body;
   const tomorrow = new Date();
   const ref = uuidv4();
+const date = dateFormat(new Date());
 
 tomorrow.setDate(tomorrow.getDate() + 1);
 const paymentUrl = vnpay.buildPaymentUrl({
@@ -287,12 +307,21 @@ const paymentUrl = vnpay.buildPaymentUrl({
     vnp_OrderInfo: description,
     vnp_OrderType: ProductCode.Other,
     vnp_Locale: VnpLocale.VN, // 'vn' hoặc 'en'
-    vnp_CreateDate: dateFormat(new Date()), // tùy chọn, mặc định là thời gian hiện tại
-    vnp_ExpireDate: dateFormat(tomorrow), 
-    vnp_ReturnUrl:'https://kichi.onrender.com/payout'    
+    vnp_CreateDate: date, // tùy chọn, mặc định là thời gian hiện tại
+    vnp_ExpireDate: dateFormat(tomorrow),     
+    vnp_ReturnUrl:'http://localhost:3000/payout'    
 });
     console.log(paymentUrl);
-  res.status(200).send(paymentUrl);
+  res.status(200).send({
+    'paymentUrl':paymentUrl, 
+    // vnp_RequestId: generateRandomString(16),
+    vnp_IpAddr: req.ip === '::1' ? '13.160.92.202' : req.ip,
+    vnp_TxnRef: orderId,
+    vnp_TransactionNo: 14422574,
+    vnp_OrderInfo: description,
+    vnp_TransactionDate: date,
+    vnp_CreateDate: date,
+  });
 });
 
 
