@@ -213,7 +213,7 @@ app.post('/register', async (req, res) => {
   
   //user
   //đặt bàn
-  app.post('customer/preorder', async (req, res) => {
+  app.post('/customer/preorder', async (req, res) => {
     try {
       const {
         customerName,
