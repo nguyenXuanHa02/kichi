@@ -66,6 +66,22 @@ app.post('/uploader',upload.single('file'), async (req, res) => {
 
 
 
+  app.post('/createStaff', async (req, res) => {
+    try {    
+      const {username, password } = req.body;
+      const collection = db.collection('user');
+      console.log(`${username}  ${password} `);
+      await collection.add({
+        "username":username, 
+        "password":password, 
+        "rule": 2
+      });
+      
+      res.status(200).send({"staus":"success"});
+    } catch (error) {
+      res.status(500).send({"status":"fail"});
+    }
+  });
 app.post('/register', async (req, res) => {
     try {    
       const {username, password } = req.body;
@@ -74,7 +90,7 @@ app.post('/register', async (req, res) => {
       await collection.add({
         "username":username, 
         "password":password, 
-        "rule": 0
+        "rule": 1
       });
       
       res.status(200).send({"staus":"success"});
