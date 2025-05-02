@@ -262,24 +262,22 @@ app.post('/register', async (req, res) => {
 //order 
 app.post('/order', async (req, res) => {
   try {
-    const { tableNumber, userId, sdt, items } = req.body;
+    const { tableNumber, items } = req.body;
 
-    if (!tableNumber || !userId || !sdt || !items || items.length === 0) {
+    if (!tableNumber ||  !items || items.length === 0) {
       return res.status(400).send({ status: 'fail', message: 'Missing table number, user ID, phone number, or menu items' });
     }
 
     // Tính tổng tiền của các món ăn
-    const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const totalAmount = items.reduce((sum, item) => sum + item.price * item.count, 0);
 
     // Lưu đơn hàng vào Firestore
     const orderRef = await db.collection('orders').add({
-      tableNumber,
-      userId,
-      sdt,
+      tableNumber,      
       items,
       totalAmount,
-      status: 'pending', // Trạng thái ban đầu là 'pending'
-      createdAt: new Date()
+      status: 'pending',
+      createdAt: dateFormat(new Date())
     });
 
     res.status(200).send({
@@ -292,6 +290,89 @@ app.post('/order', async (req, res) => {
     res.status(500).send({ status: 'fail', message: 'An error occurred while placing the order' });
   }
 });
+app.post('/order/update', async (req, res) => {
+  try {
+    const { orderId, items } = req.body;
+
+    if (!orderId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).send({
+        status: 'fail',
+        message: 'Missing or invalid orderId or items'
+      });
+    }
+
+    const orderRef = db.collection('orders').doc(orderId);
+    const orderDoc = await orderRef.get();
+
+    if (!orderDoc.exists) {
+      return res.status(404).send({
+        status: 'fail',
+        message: 'Order not found'
+      });
+    }
+
+    const totalAmount = items.reduce((sum, item) => sum + item.price * item.count, 0);
+
+    await orderRef.update({
+      items,
+      totalAmount,
+      updatedAt: dateFormat(new Date())
+    });
+
+    res.status(200).send({
+      status: 'success',
+      message: 'Order updated successfully',
+      orderId
+    });
+  } catch (error) {
+    console.error('Update order error:', error);
+    res.status(500).send({
+      status: 'fail',
+      message: 'An error occurred while updating the order'
+    });
+  }
+});
+app.post('/order/status', async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+
+    if (!orderId || !status) {
+      return res.status(400).send({
+        status: 'fail',
+        message: 'Missing orderId or status'
+      });
+    }
+
+    const orderRef = db.collection('orders').doc(orderId);
+    const orderDoc = await orderRef.get();
+
+    if (!orderDoc.exists) {
+      return res.status(404).send({
+        status: 'fail',
+        message: 'Order not found'
+      });
+    }
+
+    await orderRef.update({
+      status,
+      updatedAt: new Date()
+    });
+
+    res.status(200).send({
+      status: 'success',
+      message: 'Order status updated',
+      orderId,
+      newStatus: status
+    });
+  } catch (error) {
+    console.error('Status update error:', error);
+    res.status(500).send({
+      status: 'fail',
+      message: 'An error occurred while updating the order status'
+    });
+  }
+});
+
 app.get('/payout',async (req, res) => {
   try {
     console.log(req.query);
