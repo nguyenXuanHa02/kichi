@@ -210,6 +210,27 @@ app.post('/register', async (req, res) => {
       res.status(500).send({ status: "fail" });
     }
   });
+  app.delete('/delete_menu_item', async (req, res) => {
+    try {
+      const { name } = req.body;
+      const collection = db.collection('menu');
+  
+      const snapshot = await collection.where('name', '==', name).get();
+  
+      if (snapshot.empty) {
+        return res.status(404).send({ status: 'fail', message: 'Không tìm thấy món này' });
+      }
+  
+      snapshot.forEach(doc => {
+        doc.ref.delete();
+      });
+  
+      res.status(200).send({ status: 'success' });
+    } catch (error) {
+      console.error("Error deleting menu item:", error);
+      res.status(500).send({ status: 'fail', message: error.message });
+    }
+  });
   
   //user
   //đặt bàn
