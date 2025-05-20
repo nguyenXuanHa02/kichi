@@ -235,72 +235,83 @@ app.post('/register', async (req, res) => {
   //user
   //đặt bàn
   app.post('/customer/preorder', async (req, res) => {
-    try {
-      const {
-        customerName,
-        phoneNumber,
-        numberOfGuests,
-        arrivalTime
-      } = req.body;
-  
-      const collection = db.collection('preorders');
-  
-      await collection.add({
-        customerName,
-        phoneNumber,
-        numberOfGuests,
-        arrivalTime: new Date(arrivalTime),
-        createdAt: new Date(),
-        status: 'pending' // hoặc 'confirmed', 'canceled' nếu bạn có xử lý sau
-      });
-  
-      res.status(200).send({ status: 'success' });
-    } catch (error) {
-      console.error("Preorder error:", error);
-      res.status(500).send({ status: 'fail' });
+   try {
+    const {
+      userId,
+      customerName,
+      phoneNumber,
+      numberOfGuests,
+      arrivalTime
+    } = req.body;
+
+    const preorderData = {
+      customerName,
+      phoneNumber,
+      numberOfGuests,
+      arrivalTime: new Date(arrivalTime),
+      createdAt: new Date(),
+      status: 'pending',
+      userId
+    };
+
+    // Thêm vào collection chính "preorders"
+    const orderRef = await db.collection('preorders').add(preorderData);
+
+    // Nếu có userId thì thêm đơn đặt bàn vào collection con "user/{userId}/preorders"
+    if (userId) {
+      await db
+        .collection('user')
+        .doc(userId)
+        .collection('preorders')
+        .doc(orderRef.id) // giữ id giống để dễ đối chiếu
+        .set(preorderData); // lưu toàn bộ thông tin đơn đặt bàn
     }
-  });
-  //lấy menu
-  app.get('/menu', async (req, res) => {
-    try {
-      const snapshot = await db.collection('menu').orderBy('name').get();
-  
-      const menuItems = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-  
-      res.status(200).send({
-        status: 'success',
-        data: menuItems
-      });
-    } catch (error) {
-      console.error('Get menu error:', error);
-      res.status(500).send({ status: 'fail', message: error.message });
-    }
+
+    res.status(200).send({ status: 'success', orderId: orderRef.id });
+  } catch (error) {
+    console.error("Preorder error:", error);
+    res.status(500).send({ status: 'fail', error: error.message });
+  }
   });
   
 //order 
 app.post('/order', async (req, res) => {
   try {
-    const { tableNumber, items } = req.body;
+    const { tableNumber, items, userId } = req.body;
 
-    if (!tableNumber ||  !items || items.length === 0) {
-      return res.status(400).send({ status: 'fail', message: 'Missing table number, user ID, phone number, or menu items' });
+    if (!tableNumber || !items || items.length === 0) {
+      return res.status(400).send({
+        status: 'fail',
+        message: 'Missing table number or menu items'
+      });
     }
 
-    // Tính tổng tiền của các món ăn
     const totalAmount = items.reduce((sum, item) => sum + item.price * item.count, 0);
 
-    // Lưu đơn hàng vào Firestore
-    const orderRef = await db.collection('orders').add({
-      tableNumber,      
+    const orderData = {
+      tableNumber,
       items,
       totalAmount,
       status: 'pending',
       createdAt: dateFormat(new Date())
-    });
+    };
 
+    if (userId) {
+      orderData.userId = userId;
+    }
+
+    // Lưu vào collection chính
+    const orderRef = await db.collection('orders').add(orderData);
+
+    // Nếu có userId thì lưu thêm vào collection con: user/{userId}/orders
+    if (userId) {
+      await db
+        .collection('user')
+        .doc(userId)
+        .collection('orders')
+        .doc(orderRef.id) // dùng cùng ID để dễ tra cứu
+        .set(orderData);
+    }
     res.status(200).send({
       status: 'success',
       message: 'Order placed successfully',
@@ -308,7 +319,10 @@ app.post('/order', async (req, res) => {
     });
   } catch (error) {
     console.error('Order error:', error);
-    res.status(500).send({ status: 'fail', message: 'An error occurred while placing the order' });
+    res.status(500).send({
+      status: 'fail',
+      message: 'An error occurred while placing the order'
+    });
   }
 });
 app.post('/order/update', async (req, res) => {
