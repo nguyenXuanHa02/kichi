@@ -100,6 +100,26 @@ app.post('/register', async (req, res) => {
       });
     }
   });
+   //lấy menuAdd commentMore actions
+  app.get('/menu', async (req, res) => {
+    try {
+      const snapshot = await db.collection('menu').orderBy('name').get();
+  
+      const menuItems = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+  
+      res.status(200).send({
+        status: 'success',
+        data: menuItems
+      });
+    } catch (error) {
+      console.error('Get menu error:', error);
+      res.status(500).send({ status: 'fail', message: error.message });
+    }
+  });
+  
   app.post('/login', async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -377,7 +397,6 @@ app.post('/order/status', async (req, res) => {
         message: 'Missing orderId or status'
       });
     }
-
     const orderRef = db.collection('orders').doc(orderId);
     const orderDoc = await orderRef.get();
 
@@ -443,10 +462,8 @@ const paymentUrl = vnpay.buildPaymentUrl({
     vnp_ExpireDate: dateFormat(tomorrow),     
     vnp_ReturnUrl:'https://kichi.onrender.com/payout'    
 });
-    console.log(paymentUrl);
   res.status(200).send({
     'paymentUrl':paymentUrl, 
-    // vnp_RequestId: generateRandomString(16),
     vnp_IpAddr: req.ip === '::1' ? '13.160.92.202' : req.ip,
     vnp_TxnRef: orderId,
     vnp_TransactionNo: 14422574,
